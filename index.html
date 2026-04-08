@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Perguntas</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2rem;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            background: white;
+            color: #667eea;
+        }
+        .panel {
+            display: none;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .panel.active {
+            display: block;
+        }
+        .presenter-view {
+            text-align: center;
+        }
+        .qr-section {
+            margin-bottom: 30px;
+        }
+        #qrcode {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            display: inline-block;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        #qrcode canvas {
+            display: block;
+        }
+        .url-display {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .questions-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .question-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-radius: 0 10px 10px 0;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .question-card .meta {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .question-card .text {
+            font-size: 1.1rem;
+            color: #333;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            margin-left: 10px;
+        }
+
+        /* Formulário mobile */
+        .submit-form {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            margin-top: 10px;
+        }
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 30px;
+            color: #28a745;
+        }
+        .success-message.show {
+            display: block;
+        }
+        .success-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            .panel {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gerador de Perguntas</h1>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showPanel('presenter')">
+                Apresentador
+            </button>
+            <button class="tab" onclick="showPanel('submit')">
+                Enviar Pergunta
+            </button>
+        </div>
+
+        <!-- Painel do Apresentador -->
+        <div id="presenter-panel" class="panel active">
+            <div class="presenter-view">
+                <div class="qr-section">
+                    <h2>Escaneie para enviar sua pergunta</h2>
+                    <br>
+                    <div id="qrcode"></div>
+                    <div class="url-display" id="url-display"></div>
+                </div>
+
+                <h3>Perguntas Recebidas <span class="badge" id="question-count">0</span></h3>
+                <br>
+                <div class="questions-list" id="questions-list">
+                    <div class="empty-state">
+                        Nenhuma pergunta ainda. Aguardando...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Envio -->
+        <div id="submit-panel" class="panel">
+            <div class="submit-form" id="submit-form">
+                <div class="form-group">
+                    <label for="name">Seu nome (opcional)</label>
+                    <input type="text" id="name" placeholder="Anônimo">
+                </div>
+                <div class="form-group">
+                    <label for="question">Sua pergunta</label>
+                    <textarea id="question" placeholder="Digite sua pergunta aqui..." required></textarea>
+                </div>
+                <button class="btn" onclick="submitQuestion()">Enviar Pergunta</button>
+            </div>
+            <div class="success-message" id="success-message">
+                <div class="success-icon">✓</div>
+                <h2>Pergunta Enviada!</h2>
+                <p>Sua pergunta foi recebida pelo apresentador.</p>
+                <button class="btn btn-secondary" onclick="resetForm()">Enviar outra pergunta</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração
+        const STORAGE_KEY = 'perguntas_recebidas';
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            generateQRCode();
+            loadQuestions();
+            // Atualizar a cada 3 segundos
+            setInterval(loadQuestions, 3000);
+        });
+
+        function showPanel(panel) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+            if (panel === 'presenter') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('presenter-panel').classList.add('active');
+            } else {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('submit-panel').classList.add('active');
+            }
+        }
+
+        function generateQRCode() {
+            const baseUrl = window.location.href.split('?')[0];
+            const submitUrl = baseUrl + '?mode=submit';
+
+            document.getElementById('url-display').textContent = submitUrl;
+
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+
+            QRCode.toCanvas(submitUrl, {
+                width: 250,
+                margin: 2,
+                color: {
+                    dark: '#667eea',
+                    light: '#ffffff'
+                }
+            }, (error, canvas) => {
+                if (error) {
+                    qrContainer.innerHTML = '<p>Erro ao gerar QR Code</p>';
+                    return;
+                }
+                qrContainer.appendChild(canvas);
+            });
+        }
+
+        function loadQuestions() {
+            const questions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const container = document.getElementById('questions-list');
+            const countBadge = document.getElementById('question-count');
+
+            countBadge.textContent = questions.length;
+
+            if (questions.length === 0) {
+                container.innerHTML = '<div class="empty-state">Nenhuma pergunta ainda. Aguardando...</div>';
+                return;
+            }
+
+            container.innerHTML = questions.map((q, i) => `
+                <div class="question-card">
+                    <div class="meta">${q.name || 'Anônimo'} • ${formatTime(q.time)}</div>
+                    <div class="text">${escapeHtml(q.text)}</div>
+                </div>
+            `).join('');
+        }
+
+        function submitQuestion() {
+            const name = document.getElementById('name').value.trim();
+            const text = document.getElementById('question').value.trim();
+
+            if (!text) {
+                alert('Por favor, digite sua pergunta.');
+                return;
+            }
+
+            const questions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            questions.unshift({
+                name: name || 'Anônimo',
+                text: text,
+                time: Date.now()
+            });
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+
+            document.getElementById('submit-form').style.display = 'none';
+            document.getElementById('success-message').classList.add('show');
+        }
+
+        function resetForm() {
+            document.getElementById('name').value = '';
+            document.getElementById('question').value = '';
+            document.getElementById('submit-form').style.display = 'block';
+            document.getElementById('success-message').classList.remove('show');
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Verificar se deve abrir direto no modo envio
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('mode') === 'submit') {
+            showPanel('submit');
+        }
+    </script>
+</body>
+</html>
